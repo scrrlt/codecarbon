@@ -176,7 +176,7 @@ def compute_confidence_interval(
     
     # Edge case: very small sample sizes may produce identical bounds
     if n < 10:
-        # Log warning for unreliable statistics
+        # Log warning for STATISTICALLY INSIGNIFICANT results  
         logger.warning(
             f"Small sample size (n={n}) may produce unreliable confidence intervals. "
             "Consider n_samples >= 100 for production use."
@@ -242,8 +242,8 @@ def quantify_emissions_uncertainty(
         ...     carbon_intensity_gco2_kwh=500.0,
         ...     pue=1.2
         ... )
-        >>> print(f"Emissions: {uncertainty.emissions_kg:.3f} kg CO₂")
-        >>> print(f"95% CI: [{uncertainty.ci_lower_kg:.3f}, {uncertainty.ci_upper_kg:.3f}] kg CO₂")
+        >>> f"Emissions: {uncertainty.emissions_kg:.3f} kg CO₂"
+        >>> f"95% CI: [{uncertainty.ci_lower_kg:.3f}, {uncertainty.ci_upper_kg:.3f}] kg CO₂"
     """
     # Generate Monte Carlo samples
     samples = estimate_emissions_distribution(
