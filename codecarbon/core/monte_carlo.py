@@ -160,12 +160,18 @@ def compute_confidence_interval(
     n = len(samples)
     if n >= 100:
         try:
-            # Use optimized quantiles function from Python 3.8+
+            # Use 40 quantiles for proper 95% CI bounds (1/0.025 = 40)
+            # This ensures we get exact 2.5% and 97.5% percentiles
+            n_quantiles = int(1.0 / (alpha / 2.0))  # For α=0.05: 1/0.025 = 40
             quantiles = statistics.quantiles(
-                samples, n=int(1.0/alpha), method='inclusive'
+                samples, n=n_quantiles, method='inclusive'
             )
+            # Map to confidence interval bounds
             lower_idx = int(len(quantiles) * alpha / 2)
             upper_idx = int(len(quantiles) * (1 - alpha / 2)) - 1
+            # Ensure bounds are within quantiles array
+            lower_idx = max(0, min(lower_idx, len(quantiles) - 1))
+            upper_idx = max(0, min(upper_idx, len(quantiles) - 1))
             return (quantiles[lower_idx], quantiles[upper_idx])
         except (AttributeError, ValueError):
             # Fall back to manual sorting for older Python or edge cases

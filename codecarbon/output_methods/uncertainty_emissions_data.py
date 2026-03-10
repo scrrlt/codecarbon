@@ -14,16 +14,9 @@ from codecarbon.core.monte_carlo import UncertaintySummary
 from codecarbon.output_methods.emissions_data import EmissionsData, TaskEmissionsData
 
 
-@dataclass
-class UncertaintyAwareEmissionsData(EmissionsData):
-    """
-    Enhanced emissions data with uncertainty quantification.
+class UncertaintyMixin:
+    """Mixin for uncertainty quantification fields and methods."""
     
-    Extends the base EmissionsData to include confidence intervals
-    and uncertainty metadata from Monte Carlo analysis.
-    """
-    
-    # Uncertainty analysis results
     uncertainty_enabled: bool = False
     uncertainty_method: Optional[str] = None
     emissions_ci_lower_kg: Optional[float] = None
@@ -63,6 +56,16 @@ class UncertaintyAwareEmissionsData(EmissionsData):
                 self.uncertainty_quality = "low_precision"
             else:
                 self.uncertainty_quality = "very_low_precision"
+
+
+@dataclass
+class UncertaintyAwareEmissionsData(EmissionsData, UncertaintyMixin):
+    """
+    Enhanced emissions data with uncertainty quantification.
+    
+    Extends the base EmissionsData to include confidence intervals
+    and uncertainty metadata from Monte Carlo analysis.
+    """
 
     @property
     def values(self) -> OrderedDict:
@@ -161,39 +164,11 @@ class UncertaintyAwareEmissionsData(EmissionsData):
 
 
 @dataclass
-class UncertaintyAwareTaskEmissionsData(TaskEmissionsData):
+class UncertaintyAwareTaskEmissionsData(TaskEmissionsData, UncertaintyMixin):
     """
     Task-level emissions data with uncertainty quantification.
     
     Inherits all base task fields from TaskEmissionsData and adds
-    uncertainty-specific metadata and confidence intervals.
+    uncertainty-specific metadata and confidence intervals via UncertaintyMixin.
     """
-    
-    # Uncertainty fields - only declare new fields, inherit the rest
-    uncertainty_enabled: bool = False
-    uncertainty_method: Optional[str] = None
-    emissions_ci_lower_kg: Optional[float] = None
-    emissions_ci_upper_kg: Optional[float] = None
-    confidence_level_pct: Optional[float] = None
-    relative_uncertainty_pct: Optional[float] = None
-    uncertainty_quality: Optional[str] = None
-
-    def set_uncertainty_data(self, uncertainty_summary: UncertaintySummary) -> None:
-        """Populate uncertainty fields from analysis results."""
-        self.uncertainty_enabled = True
-        self.uncertainty_method = uncertainty_summary.method
-        self.emissions_ci_lower_kg = uncertainty_summary.ci_lower_kg
-        self.emissions_ci_upper_kg = uncertainty_summary.ci_upper_kg
-        self.confidence_level_pct = uncertainty_summary.confidence_level_pct
-        self.relative_uncertainty_pct = uncertainty_summary.relative_uncertainty_pct
-        
-        # Quality assessment
-        if self.relative_uncertainty_pct is not None:
-            if self.relative_uncertainty_pct <= 5.0:
-                self.uncertainty_quality = "high_precision"
-            elif self.relative_uncertainty_pct <= 15.0:
-                self.uncertainty_quality = "moderate_precision"
-            elif self.relative_uncertainty_pct <= 25.0:
-                self.uncertainty_quality = "low_precision"
-            else:
-                self.uncertainty_quality = "very_low_precision"
+    pass  # All uncertainty functionality provided by UncertaintyMixin

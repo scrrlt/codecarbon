@@ -6,6 +6,7 @@ Monte Carlo uncertainty analysis, providing confidence intervals and
 precision assessments for carbon footprint estimates.
 """
 
+import math
 from typing import Optional
 
 from codecarbon.core.emissions import Emissions
@@ -248,6 +249,19 @@ class UncertaintyAwareEmissions(Emissions):
             ValueError: If energy is zero or calculation is invalid
             ZeroDivisionError: If energy or PUE is zero
         """
+        # Guard against NaN/Infinity inputs
+        if not math.isfinite(energy_kwh) or not math.isfinite(emissions_kg) or not math.isfinite(pue):
+            logger.warning(
+                "Non-finite input detected (energy_kwh=%s, emissions_kg=%s, pue=%s). "
+                "Using world average fallback.",
+                energy_kwh, emissions_kg, pue
+            )
+            try:
+                carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
+                return carbon_intensity_per_source.get("world_average", 475.0)
+            except Exception:
+                return 475.0
+        
         if energy_kwh <= 1e-6:  # Below 1 milliwatt-hour threshold
             logger.warning(
                 f"Energy consumption too small for reliable reverse calculation: {energy_kwh} kWh. "
@@ -266,6 +280,17 @@ class UncertaintyAwareEmissions(Emissions):
         # emissions = energy * pue * carbon_intensity / 1000  (convert g to kg)
         # Therefore: carbon_intensity = emissions * 1000 / (energy * pue)
         carbon_intensity_gco2_kwh = (emissions_kg * 1000) / (energy_kwh * pue)
+        
+        # Guard against non-finite result from calculation
+        if not math.isfinite(carbon_intensity_gco2_kwh):
+            logger.warning(
+                "Calculated carbon intensity is non-finite. Using world average fallback."
+            )
+            try:
+                carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
+                return carbon_intensity_per_source.get("world_average", 475.0)
+            except Exception:
+                return 475.0
         
         if carbon_intensity_gco2_kwh < 0 or carbon_intensity_gco2_kwh > 2000:
             logger.warning(
