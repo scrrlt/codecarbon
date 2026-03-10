@@ -17,15 +17,22 @@ from __future__ import annotations
 
 import math
 import random
+import statistics
 from dataclasses import dataclass
 from typing import Optional
 
 from codecarbon.core.units import Energy
+from codecarbon.external.logger import logger
 
 
 @dataclass(frozen=True)
 class UncertaintySummary:
-    """Metadata describing Monte Carlo uncertainty analysis results."""
+    """Metadata describing Monte Carlo uncertainty analysis results.
+    
+    Note: Physical clamping constraints (PUE ≥ 1.0, energy ≥ 0) create
+    truncated normal distributions which may introduce slight positive bias
+    in the mean estimate for low-energy scenarios.
+    """
     
     method: str
     emissions_kg: float
@@ -97,13 +104,19 @@ def estimate_emissions_distribution(
         
         For reliable confidence intervals, n_samples should be ≥ 100.
         Small sample sizes (< 30) may produce unreliable statistical estimates.
+        
+        Physical clamping (PUE ≥ 1.0, energy ≥ 0) creates truncated normal
+        distributions which may introduce slight positive bias in low-energy scenarios.
     """
     rng = random.Random() if seed is None else random.Random(seed)  # nosec B311
     samples: list[float] = []
 
-    # Convert percentage uncertainties to standard deviations (assuming ±2σ bounds)
+    # Convert percentage uncertainties to standard deviations
+    # (assuming ±2σ bounds)
     energy_sigma = energy_kwh * (energy_uncertainty_pct / 100.0) / 2.0
-    ci_sigma = carbon_intensity_gco2_kwh * (carbon_intensity_uncertainty_pct / 100.0) / 2.0
+    ci_sigma = carbon_intensity_gco2_kwh * (
+        carbon_intensity_uncertainty_pct / 100.0
+    ) / 2.0
     pue_sigma = pue * (pue_uncertainty_pct / 100.0) / 2.0
 
     for _ in range(max(1, n_samples)):
@@ -143,11 +156,31 @@ def compute_confidence_interval(
     if not samples:
         return (0.0, 0.0)
 
+    # Performance optimization: use statistics.quantiles for large datasets
+    n = len(samples)
+    if n >= 100:
+        try:
+            # Use optimized quantiles function from Python 3.8+
+            quantiles = statistics.quantiles(
+                samples, n=int(1.0/alpha), method='inclusive'
+            )
+            lower_idx = int(len(quantiles) * alpha / 2)
+            upper_idx = int(len(quantiles) * (1 - alpha / 2)) - 1
+            return (quantiles[lower_idx], quantiles[upper_idx])
+        except (AttributeError, ValueError):
+            # Fall back to manual sorting for older Python or edge cases
+            pass
+    
+    # Manual percentile calculation for small samples or fallback
     sorted_samples = sorted(samples)
-    n = len(sorted_samples)
     
     # Edge case: very small sample sizes may produce identical bounds
     if n < 10:
+        # Log warning for unreliable statistics
+        logger.warning(
+            f"Small sample size (n={n}) may produce unreliable confidence intervals. "
+            "Consider n_samples >= 100 for production use."
+        )
         # Return min/max for very small samples
         return (sorted_samples[0], sorted_samples[-1])
     

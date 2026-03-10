@@ -248,8 +248,16 @@ class UncertaintyAwareEmissions(Emissions):
             ValueError: If energy is zero or calculation is invalid
             ZeroDivisionError: If energy or PUE is zero
         """
-        if energy_kwh <= 0:
-            raise ValueError(f"Energy consumption must be positive, got {energy_kwh}")
+        if energy_kwh <= 1e-6:  # Below 1 milliwatt-hour threshold
+            logger.warning(
+                f"Energy consumption too small for reliable reverse calculation: {energy_kwh} kWh. "
+                "Using world average fallback to prevent floating-point overflow."
+            )
+            try:
+                carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
+                return carbon_intensity_per_source.get("world_average", 475.0)
+            except Exception:
+                return 475.0
             
         if pue <= 0:
             raise ZeroDivisionError(f"PUE must be positive, got {pue}")

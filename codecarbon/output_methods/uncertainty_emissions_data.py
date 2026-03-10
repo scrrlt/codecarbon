@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from codecarbon.core.monte_carlo import UncertaintySummary
-from codecarbon.output_methods.emissions_data import EmissionsData
+from codecarbon.output_methods.emissions_data import EmissionsData, TaskEmissionsData
 
 
 @dataclass
@@ -161,48 +161,15 @@ class UncertaintyAwareEmissionsData(EmissionsData):
 
 
 @dataclass
-class UncertaintyAwareTaskEmissionsData:
+class UncertaintyAwareTaskEmissionsData(TaskEmissionsData):
     """
     Task-level emissions data with uncertainty quantification.
     
-    Similar to UncertaintyAwareEmissionsData but for individual tasks
-    within a larger tracking experiment.
+    Inherits all base task fields from TaskEmissionsData and adds
+    uncertainty-specific metadata and confidence intervals.
     """
     
-    # Base task fields (from TaskEmissionsData)
-    task_name: str
-    timestamp: str
-    project_name: str
-    run_id: str
-    duration: float
-    emissions: float
-    emissions_rate: float
-    cpu_power: float
-    gpu_power: float
-    ram_power: float
-    cpu_energy: float
-    gpu_energy: float
-    ram_energy: float
-    energy_consumed: float
-    water_consumed: float
-    country_name: str
-    country_iso_code: str
-    region: str
-    cloud_provider: str
-    cloud_region: str
-    os: str
-    python_version: str
-    codecarbon_version: str
-    cpu_count: float
-    cpu_model: str
-    gpu_count: float
-    gpu_model: str
-    longitude: float
-    latitude: float
-    ram_total_size: float
-    tracking_mode: str
-    
-    # Uncertainty fields
+    # Uncertainty fields - only declare new fields, inherit the rest
     uncertainty_enabled: bool = False
     uncertainty_method: Optional[str] = None
     emissions_ci_lower_kg: Optional[float] = None
