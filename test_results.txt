@@ -1,4 +1,0 @@
-============================================================
-CodeCarbon Uncertainty Analysis - Standalone Tests
-============================================================
-Testing Monte Carlo Core Functions...
