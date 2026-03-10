@@ -90,8 +90,21 @@ class UncertaintyAwareEmissions(Emissions):
         if not self.enable_uncertainty:
             return point_emissions_kg, None
             
-        # Get carbon intensity for uncertainty analysis
-        carbon_intensity_gco2_kwh = self._get_carbon_intensity_for_geo(geo)
+        # Performance consideration: warn for large sample sizes
+        if self.monte_carlo_samples > 10000:
+            logger.warning(
+                f"Large sample size ({self.monte_carlo_samples}) may cause performance issues. "
+                "Consider reducing for high-frequency tracking."
+            )
+            
+        # Use existing base class methods to get carbon intensity
+        try:
+            carbon_intensity_gco2_kwh = self._extract_carbon_intensity_from_emissions(
+                point_emissions_kg, energy.kWh, pue
+            )
+        except (ValueError, ZeroDivisionError) as e:
+            logger.error(f"Failed to extract carbon intensity: {e}")
+            return point_emissions_kg, None
         
         # Use provided uncertainties or defaults
         energy_unc = energy_uncertainty_pct or self.default_energy_uncertainty_pct
@@ -112,16 +125,19 @@ class UncertaintyAwareEmissions(Emissions):
             )
             
             logger.debug(
-                f"Uncertainty analysis: {uncertainty_summary['emissions_kg']:.3f} kg CO₂ "
-                f"(95% CI: [{uncertainty_summary['ci_lower_kg']:.3f}, "
-                f"{uncertainty_summary['ci_upper_kg']:.3f}]), "
-                f"relative uncertainty: {uncertainty_summary['relative_uncertainty_pct']:.1f}%"
+                f"Uncertainty analysis: {uncertainty_summary.emissions_kg:.3f} kg CO₂ "
+                f"(95% CI: [{uncertainty_summary.ci_lower_kg:.3f}, "
+                f"{uncertainty_summary.ci_upper_kg:.3f}]), "
+                f"relative uncertainty: {uncertainty_summary.relative_uncertainty_pct:.1f}%"
             )
             
             return point_emissions_kg, uncertainty_summary
             
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid parameters for uncertainty analysis: {e}")
+            return point_emissions_kg, None
         except Exception as e:
-            logger.warning(f"Uncertainty analysis failed: {e}. Returning point estimate only.")
+            logger.warning(f"Unexpected error in uncertainty analysis: {e}. Returning point estimate only.")
             return point_emissions_kg, None
 
     def get_cloud_emissions_with_uncertainty(
@@ -155,8 +171,21 @@ class UncertaintyAwareEmissions(Emissions):
         if not self.enable_uncertainty:
             return point_emissions_kg, None
             
-        # Get carbon intensity for uncertainty analysis
-        carbon_intensity_gco2_kwh = self._get_carbon_intensity_for_cloud(cloud, geo)
+        # Performance consideration: warn for large sample sizes
+        if self.monte_carlo_samples > 10000:
+            logger.warning(
+                f"Large sample size ({self.monte_carlo_samples}) may cause performance issues. "
+                "Consider reducing for high-frequency tracking."
+            )
+            
+        # Use existing base class methods to get carbon intensity
+        try:
+            carbon_intensity_gco2_kwh = self._extract_carbon_intensity_from_emissions(
+                point_emissions_kg, energy.kWh, pue
+            )
+        except (ValueError, ZeroDivisionError) as e:
+            logger.error(f"Failed to extract carbon intensity: {e}")
+            return point_emissions_kg, None
         
         # Cloud environments typically have higher PUE uncertainty
         # due to varying datacenter efficiency and location
@@ -180,86 +209,61 @@ class UncertaintyAwareEmissions(Emissions):
             )
             
             logger.debug(
-                f"Cloud uncertainty analysis: {uncertainty_summary['emissions_kg']:.3f} kg CO₂ "
-                f"(95% CI: [{uncertainty_summary['ci_lower_kg']:.3f}, "
-                f"{uncertainty_summary['ci_upper_kg']:.3f}])"
+                f"Cloud uncertainty analysis: {uncertainty_summary.emissions_kg:.3f} kg CO₂ "
+                f"(95% CI: [{uncertainty_summary.ci_lower_kg:.3f}, "
+                f"{uncertainty_summary.ci_upper_kg:.3f}])"
             )
             
             return point_emissions_kg, uncertainty_summary
             
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid parameters for cloud uncertainty analysis: {e}")
+            return point_emissions_kg, None
         except Exception as e:
-            logger.warning(f"Cloud uncertainty analysis failed: {e}. Returning point estimate only.")
+            logger.warning(f"Unexpected error in cloud uncertainty analysis: {e}. Returning point estimate only.")
             return point_emissions_kg, None
 
-    def _get_carbon_intensity_for_geo(self, geo: GeoMetadata) -> float:
-        """
-        Extract carbon intensity value for geographic region.
-        
-        Args:
-            geo: Geographic metadata
-            
-        Returns:
-            Carbon intensity in g CO₂/kWh
-        """
-        try:
-            # Check for regional data first
-            if geo.region and geo.country_iso_code.upper() in ["USA", "CAN"]:
-                country_data = self._data_source.get_country_emissions_data(
-                    geo.country_iso_code.lower()
-                )
-                if geo.region in country_data:
-                    # Convert from lbs/MWh to g/kWh if needed
-                    emissions_per_kwh = country_data[geo.region].get("emissions", 0)
-                    return emissions_per_kwh * 453.592  # lbs to grams conversion
-                    
-            # Fallback to country-level data
-            energy_mix = self._data_source.get_global_energy_mix_data()
-            if geo.country_iso_code in energy_mix:
-                country_data = energy_mix[geo.country_iso_code]
-                if "carbon_intensity" in country_data:
-                    return country_data["carbon_intensity"]
-                    
-            # Ultimate fallback to world average
-            carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
-            return carbon_intensity_per_source.get("world_average", 475.0)  # g CO₂/kWh
-            
-        except Exception as e:
-            logger.warning(f"Failed to get carbon intensity for {geo.country_name}: {e}")
-            return 475.0  # World average fallback
-
-    def _get_carbon_intensity_for_cloud(
-        self, 
-        cloud: CloudMetadata, 
-        geo: Optional[GeoMetadata] = None
+    def _extract_carbon_intensity_from_emissions(
+        self,
+        emissions_kg: float,
+        energy_kwh: float, 
+        pue: float = 1.0
     ) -> float:
         """
-        Extract carbon intensity value for cloud region.
+        Extract carbon intensity from existing emissions calculation.
+        
+        This method leverages the existing calculation by reverse-engineering
+        the carbon intensity from the emissions and energy values, avoiding
+        duplication of the complex lookup logic in the base class.
         
         Args:
-            cloud: Cloud metadata
-            geo: Geographic metadata (fallback)
+            emissions_kg: Calculated emissions in kg CO₂
+            energy_kwh: Energy consumption in kWh
+            pue: Power Usage Effectiveness
             
         Returns:
             Carbon intensity in g CO₂/kWh
+            
+        Raises:
+            ValueError: If energy is zero or calculation is invalid
+            ZeroDivisionError: If energy or PUE is zero
         """
-        try:
-            # Get cloud-specific carbon intensity
-            df = self._data_source.get_cloud_emissions_data()
-            matches = df[
-                (df["provider"] == cloud.provider) & (df["region"] == cloud.region)
-            ]
+        if energy_kwh <= 0:
+            raise ValueError(f"Energy consumption must be positive, got {energy_kwh}")
             
-            if len(matches) > 0:
-                return matches["impact"].iloc[0]  # g CO₂/kWh
-                
-            # Fallback to geographic data
-            if geo:
-                return self._get_carbon_intensity_for_geo(geo)
-                
-            # Ultimate fallback
-            carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
-            return carbon_intensity_per_source.get("world_average", 475.0)
+        if pue <= 0:
+            raise ZeroDivisionError(f"PUE must be positive, got {pue}")
             
-        except Exception as e:
-            logger.warning(f"Failed to get cloud carbon intensity for {cloud.provider}/{cloud.region}: {e}")
+        # Reverse-engineer carbon intensity from emissions calculation
+        # emissions = energy * pue * carbon_intensity / 1000  (convert g to kg)
+        # Therefore: carbon_intensity = emissions * 1000 / (energy * pue)
+        carbon_intensity_gco2_kwh = (emissions_kg * 1000) / (energy_kwh * pue)
+        
+        if carbon_intensity_gco2_kwh < 0 or carbon_intensity_gco2_kwh > 2000:
+            logger.warning(
+                f"Calculated carbon intensity ({carbon_intensity_gco2_kwh:.1f} g CO₂/kWh) "
+                "seems unrealistic. Using world average fallback."
+            )
             return 475.0  # World average fallback
+            
+        return carbon_intensity_gco2_kwh

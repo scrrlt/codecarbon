@@ -47,11 +47,11 @@ class UncertaintyAwareEmissionsData(EmissionsData):
             uncertainty_summary: Results from uncertainty quantification
         """
         self.uncertainty_enabled = True
-        self.uncertainty_method = uncertainty_summary["method"]
-        self.emissions_ci_lower_kg = uncertainty_summary["ci_lower_kg"]
-        self.emissions_ci_upper_kg = uncertainty_summary["ci_upper_kg"]
-        self.confidence_level_pct = uncertainty_summary["confidence_level_pct"]
-        self.relative_uncertainty_pct = uncertainty_summary["relative_uncertainty_pct"]
+        self.uncertainty_method = uncertainty_summary.method
+        self.emissions_ci_lower_kg = uncertainty_summary.ci_lower_kg
+        self.emissions_ci_upper_kg = uncertainty_summary.ci_upper_kg
+        self.confidence_level_pct = uncertainty_summary.confidence_level_pct
+        self.relative_uncertainty_pct = uncertainty_summary.relative_uncertainty_pct
         
         # Assess uncertainty quality
         if self.relative_uncertainty_pct is not None:
@@ -214,11 +214,11 @@ class UncertaintyAwareTaskEmissionsData:
     def set_uncertainty_data(self, uncertainty_summary: UncertaintySummary) -> None:
         """Populate uncertainty fields from analysis results."""
         self.uncertainty_enabled = True
-        self.uncertainty_method = uncertainty_summary["method"]
-        self.emissions_ci_lower_kg = uncertainty_summary["ci_lower_kg"]
-        self.emissions_ci_upper_kg = uncertainty_summary["ci_upper_kg"]
-        self.confidence_level_pct = uncertainty_summary["confidence_level_pct"]
-        self.relative_uncertainty_pct = uncertainty_summary["relative_uncertainty_pct"]
+        self.uncertainty_method = uncertainty_summary.method
+        self.emissions_ci_lower_kg = uncertainty_summary.ci_lower_kg
+        self.emissions_ci_upper_kg = uncertainty_summary.ci_upper_kg
+        self.confidence_level_pct = uncertainty_summary.confidence_level_pct
+        self.relative_uncertainty_pct = uncertainty_summary.relative_uncertainty_pct
         
         # Quality assessment
         if self.relative_uncertainty_pct is not None:

@@ -6,6 +6,7 @@ Monte Carlo uncertainty analysis to provide confidence intervals
 and precision assessments for carbon footprint measurements.
 """
 
+import dataclasses
 import time
 from datetime import datetime
 from typing import Optional
@@ -131,142 +132,45 @@ class UncertaintyAwareEmissionsTracker(BaseEmissionsTracker):
         """
         Prepare enhanced emissions data with uncertainty analysis.
         
+        Uses composition over duplication by calling the base class method
+        and then enhancing it with uncertainty-specific fields.
+        
         Returns:
             UncertaintyAwareEmissionsData object with uncertainty metadata
         """
-        self._update_emissions_with_uncertainty()
-        cloud: CloudMetadata = self._get_cloud_metadata()
-        duration = time.perf_counter() - self._start_time
-
-        emissions = self._total_emissions
+        # Call parent class method to get base emissions data
+        base_emissions_data = super()._prepare_emissions_data()
         
-        # Calculate average power values (same as base tracker)
-        avg_cpu_power = (
-            self._cpu_power_sum / self._power_measurement_count
-            if self._power_measurement_count > 0
-            else self._cpu_power.W
+        # Convert to uncertainty-aware version by copying all fields
+        uncertainty_emissions_data = UncertaintyAwareEmissionsData(
+            **dataclasses.asdict(base_emissions_data)
         )
-        avg_gpu_power = (
-            self._gpu_power_sum / self._power_measurement_count
-            if self._power_measurement_count > 0
-            else self._gpu_power.W
-        )
-        avg_ram_power = (
-            self._ram_power_sum / self._power_measurement_count
-            if self._power_measurement_count > 0
-            else self._ram_power.W
-        )
-
-        # Get geographic information (same logic as base tracker)
-        if cloud.is_on_private_infra:
-            country_name = self._geo.country_name
-            country_iso_code = self._geo.country_iso_code
-            region = self._geo.region
-            on_cloud = "N"
-            cloud_provider = ""
-            cloud_region = ""
-        else:
-            try:
-                country_name = self._emissions.get_cloud_country_name(cloud)
-            except ValueError:
-                country_name = self._geo.country_name
-            
-            try:
-                country_iso_code = self._emissions.get_cloud_country_iso_code(cloud)
-            except ValueError:
-                country_iso_code = self._geo.country_iso_code
-                
-            try:
-                region = self._emissions.get_cloud_geo_region(cloud)
-            except ValueError:
-                region = self._geo.region
-
-            on_cloud = "Y"
-            cloud_provider = cloud.provider
-            cloud_region = cloud.region
-
-        # Create enhanced emissions data object
-        emissions_data = UncertaintyAwareEmissionsData(
-            timestamp=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-            project_name=self._project_name,
-            run_id=str(self.run_id),
-            experiment_id=str(self._experiment_id),
-            duration=duration,
-            emissions=emissions,
-            emissions_rate=emissions / duration if duration > 0 else 0,
-            cpu_utilization_percent=(
-                sum(self._cpu_utilization_history) / len(self._cpu_utilization_history)
-                if self._cpu_utilization_history
-                else 0
-            ),
-            gpu_utilization_percent=(
-                sum(self._gpu_utilization_history) / len(self._gpu_utilization_history)
-                if self._gpu_utilization_history
-                else 0
-            ),
-            ram_utilization_percent=(
-                sum(self._ram_utilization_history) / len(self._ram_utilization_history)
-                if self._ram_utilization_history
-                else 0
-            ),
-            ram_used_gb=(
-                sum(self._ram_used_history) / len(self._ram_used_history)
-                if self._ram_used_history
-                else 0
-            ),
-            cpu_power=avg_cpu_power,
-            gpu_power=avg_gpu_power,
-            ram_power=avg_ram_power,
-            cpu_energy=self._total_cpu_energy.kWh,
-            gpu_energy=self._total_gpu_energy.kWh,
-            ram_energy=self._total_ram_energy.kWh,
-            energy_consumed=self._total_energy.kWh,
-            water_consumed=self._total_water.litres,
-            country_name=country_name,
-            country_iso_code=country_iso_code,
-            region=region,
-            on_cloud=on_cloud,
-            cloud_provider=cloud_provider,
-            cloud_region=cloud_region,
-            os=self._conf.get("os"),
-            python_version=self._conf.get("python_version"),
-            codecarbon_version=self._conf.get("codecarbon_version"),
-            gpu_count=self._conf.get("gpu_count", 0),
-            gpu_model=self._conf.get("gpu_model", ""),
-            cpu_count=self._conf.get("cpu_count"),
-            cpu_model=self._conf.get("cpu_model"),
-            longitude=self._conf.get("longitude"),
-            latitude=self._conf.get("latitude"),
-            ram_total_size=self._conf.get("ram_total_size"),
-            tracking_mode=self._conf.get("tracking_mode"),
-            pue=self._pue,
-            wue=self._wue,
-        )
-
+        
         # Add uncertainty data if available
         if self._last_uncertainty_summary and self.enable_uncertainty:
-            emissions_data.set_uncertainty_data(self._last_uncertainty_summary)
-            emissions_data.energy_uncertainty_pct = self.energy_uncertainty_pct
-            emissions_data.carbon_intensity_uncertainty_pct = self.carbon_intensity_uncertainty_pct
-            emissions_data.pue_uncertainty_pct = self.pue_uncertainty_pct
-            emissions_data.monte_carlo_samples = self.monte_carlo_samples
-            emissions_data.uncertainty_seed = self.uncertainty_seed
+            uncertainty_emissions_data.set_uncertainty_data(self._last_uncertainty_summary)
+            uncertainty_emissions_data.energy_uncertainty_pct = self.energy_uncertainty_pct
+            uncertainty_emissions_data.carbon_intensity_uncertainty_pct = self.carbon_intensity_uncertainty_pct
+            uncertainty_emissions_data.pue_uncertainty_pct = self.pue_uncertainty_pct
+            uncertainty_emissions_data.monte_carlo_samples = self.monte_carlo_samples
+            uncertainty_emissions_data.uncertainty_seed = self.uncertainty_seed
             
             # Log uncertainty summary
-            logger.info(emissions_data.format_uncertainty_summary())
+            logger.info(uncertainty_emissions_data.format_uncertainty_summary())
 
-        return emissions_data
+        return uncertainty_emissions_data
 
-    def _update_emissions_with_uncertainty(self) -> None:
+    def _update_emissions(self) -> None:
         """
         Update emissions calculations with uncertainty analysis.
         
-        This method performs the core uncertainty-aware emissions calculation,
-        replacing the base tracker's _update_emissions method.
+        This method extends the base class functionality by performing
+        uncertainty-aware emissions calculation instead of point estimates only.
         """
         delta_energy = self._total_energy - self._last_energy_covered
         
         if delta_energy.kWh <= 0:
+            self._last_uncertainty_summary = None
             return  # No new energy consumption to process
             
         cloud: CloudMetadata = self._get_cloud_metadata()
@@ -307,5 +211,5 @@ class UncertaintyAwareEmissionsTracker(BaseEmissionsTracker):
         if uncertainty_summary:
             logger.debug(
                 f"Delta emissions: {delta_emissions:.4f} kg CO₂, "
-                f"Uncertainty: ±{uncertainty_summary['relative_uncertainty_pct']:.1f}%"
+                f"Uncertainty: ±{uncertainty_summary.relative_uncertainty_pct:.1f}%"
             )

@@ -17,14 +17,16 @@ from __future__ import annotations
 
 import math
 import random
-from typing import TypedDict
+from dataclasses import dataclass
+from typing import Optional
 
 from codecarbon.core.units import Energy
 
 
-class UncertaintySummary(TypedDict):
+@dataclass(frozen=True)
+class UncertaintySummary:
     """Metadata describing Monte Carlo uncertainty analysis results."""
-
+    
     method: str
     emissions_kg: float
     ci_lower_kg: float
