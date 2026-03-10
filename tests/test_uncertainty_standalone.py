@@ -10,8 +10,8 @@ import sys
 import os
 
 # Add codecarbon directory to path for direct module imports
-codecarbon_path = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(codecarbon_path, 'codecarbon', 'core'))
+codecarbon_path = os.path.dirname(os.path.dirname(__file__))  # Go up one level from tests/
+sys.path.insert(0, codecarbon_path)  # Add root codecarbon directory for module imports
 
 # Direct imports to avoid full package initialization
 import importlib.util
@@ -20,8 +20,51 @@ def load_module_from_path(module_name, file_path):
     """Load a Python module directly from file path."""
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    # Temporarily override any problematic imports in monte_carlo.py
+    original_modules = {}
+    required_mocks = [
+        'codecarbon.core.units',
+        'codecarbon.core.schemas',
+    ]
+    
+    for mock_module in required_mocks:
+        if mock_module not in sys.modules:
+            # Create a minimal mock module
+            mock = type(sys)('mock_module')
+            if 'units' in mock_module:
+                mock.Energy = MockEnergy
+            elif 'schemas' in mock_module:
+                mock.UncertaintySummary = UncertaintySummary
+            sys.modules[mock_module] = mock
+            original_modules[mock_module] = True
+    
+    try:
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        # Clean up mocks
+        for mock_module in original_modules:
+            del sys.modules[mock_module]
+
+def UncertaintySummary(mean_kg_co2, std_kg_co2, confidence_interval):
+    """Mock UncertaintySummary for testing."""
+    return {
+        'mean_kg_co2': mean_kg_co2,
+        'std_kg_co2': std_kg_co2,
+        'confidence_interval': confidence_interval,
+    }
+
+def MockEnergy(kwh_value):
+    """Mock Energy class for testing."""
+    class MockEnergy:
+        def __init__(self, kwh):
+            self.kwh = kwh
+        
+        @property
+        def kWh(self):
+            return self.kwh
+    
+    return MockEnergy(kwh_value)
 
 # Load monte_carlo module directly
 monte_carlo_path = os.path.join(codecarbon_path, 'codecarbon', 'core', 'monte_carlo.py')
@@ -33,18 +76,6 @@ estimate_emissions_distribution = monte_carlo.estimate_emissions_distribution
 compute_confidence_interval = monte_carlo.compute_confidence_interval
 quantify_emissions_uncertainty = monte_carlo.quantify_emissions_uncertainty
 assess_uncertainty_quality = monte_carlo.assess_uncertainty_quality
-
-def mock_energy_class():
-    """Mock Energy class for testing."""
-    class MockEnergy:
-        def __init__(self, kwh):
-            self.kWh = kwh
-        
-        @classmethod
-        def from_kWh(cls, kwh):
-            return cls(kwh)
-    
-    return MockEnergy
 
 def test_basic_monte_carlo():
     """Test basic Monte Carlo functionality."""

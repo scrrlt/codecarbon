@@ -264,6 +264,12 @@ class UncertaintyAwareEmissions(Emissions):
                 f"Calculated carbon intensity ({carbon_intensity_gco2_kwh:.1f} g CO₂/kWh) "
                 "seems unrealistic. Using world average fallback."
             )
-            return 475.0  # World average fallback
+            # Use data source world average instead of hardcoded value
+            try:
+                carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
+                world_average = carbon_intensity_per_source.get("world_average", 475.0)  # 475.0 as ultimate fallback
+            except Exception:
+                world_average = 475.0  # Ultimate fallback if data source unavailable
+            return world_average
             
         return carbon_intensity_gco2_kwh
