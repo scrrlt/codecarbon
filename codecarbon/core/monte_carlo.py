@@ -28,12 +28,12 @@ from codecarbon.external.logger import logger
 @dataclass(frozen=True)
 class UncertaintySummary:
     """Metadata describing Monte Carlo uncertainty analysis results.
-    
+
     Note: Physical clamping constraints (PUE ≥ 1.0, energy ≥ 0) create
     truncated normal distributions which may introduce slight positive bias
     in the mean estimate for low-energy scenarios.
     """
-    
+
     method: str
     emissions_kg: float
     ci_lower_kg: float
@@ -95,16 +95,16 @@ def estimate_emissions_distribution(
 
     Returns:
         List of simulated emissions values in kg CO₂
-        
+
     Notes:
         Default uncertainty values are based on literature:
         - Energy measurement: ±10% (typical smart meter uncertainty)
         - Carbon intensity: ±15% (grid mix temporal variation)
         - PUE: ±5% (datacenter efficiency variance)
-        
+
         For reliable confidence intervals, n_samples should be ≥ 100.
         Small sample sizes (< 30) may produce unreliable statistical estimates.
-        
+
         Physical clamping (PUE ≥ 1.0, energy ≥ 0) creates truncated normal
         distributions which may introduce slight positive bias in low-energy scenarios.
     """
@@ -114,22 +114,24 @@ def estimate_emissions_distribution(
     # Convert percentage uncertainties to standard deviations
     # (assuming ±2σ bounds)
     energy_sigma = energy_kwh * (energy_uncertainty_pct / 100.0) / 2.0
-    ci_sigma = carbon_intensity_gco2_kwh * (
-        carbon_intensity_uncertainty_pct / 100.0
-    ) / 2.0
+    ci_sigma = (
+        carbon_intensity_gco2_kwh * (carbon_intensity_uncertainty_pct / 100.0) / 2.0
+    )
     pue_sigma = pue * (pue_uncertainty_pct / 100.0) / 2.0
 
     for _ in range(max(1, n_samples)):
         # Sample uncertain parameters
         sampled_energy = max(0.0, _sample_normal(energy_kwh, energy_sigma, rng))
-        sampled_intensity = max(0.0, _sample_normal(carbon_intensity_gco2_kwh, ci_sigma, rng))
+        sampled_intensity = max(
+            0.0, _sample_normal(carbon_intensity_gco2_kwh, ci_sigma, rng)
+        )
         sampled_pue = max(1.0, _sample_normal(pue, pue_sigma, rng))
-        
+
         # Calculate emissions for this sample
         total_energy_kwh = sampled_energy * sampled_pue
         emissions_g = total_energy_kwh * sampled_intensity
         emissions_kg = emissions_g / 1000.0
-        
+
         samples.append(emissions_kg)
 
     return samples
@@ -148,7 +150,7 @@ def compute_confidence_interval(
 
     Returns:
         Tuple of (lower_bound, upper_bound) for confidence interval
-        
+
     Note:
         Sample sizes below 100 may produce statistically unreliable confidence intervals.
         Consider increasing n_samples for production uncertainty analysis.
@@ -163,9 +165,7 @@ def compute_confidence_interval(
             # Use 40 quantiles for proper 95% CI bounds (1/0.025 = 40)
             # This ensures we get exact 2.5% and 97.5% percentiles
             n_quantiles = int(1.0 / (alpha / 2.0))  # For α=0.05: 1/0.025 = 40
-            quantiles = statistics.quantiles(
-                samples, n=n_quantiles, method='inclusive'
-            )
+            quantiles = statistics.quantiles(samples, n=n_quantiles, method="inclusive")
             # Map to confidence interval bounds
             lower_idx = int(len(quantiles) * alpha / 2)
             upper_idx = int(len(quantiles) * (1 - alpha / 2)) - 1
@@ -176,29 +176,29 @@ def compute_confidence_interval(
         except (AttributeError, ValueError):
             # Fall back to manual sorting for older Python or edge cases
             pass
-    
+
     # Manual percentile calculation for small samples or fallback
     sorted_samples = sorted(samples)
-    
+
     # Edge case: very small sample sizes may produce identical bounds
     if n < 10:
-        # Log warning for STATISTICALLY INSIGNIFICANT results  
+        # Log warning for STATISTICALLY INSIGNIFICANT results
         logger.warning(
             f"Small sample size (n={n}) may produce unreliable confidence intervals. "
             "Consider n_samples >= 100 for production use."
         )
         # Return min/max for very small samples
         return (sorted_samples[0], sorted_samples[-1])
-    
+
     # Calculate percentile indices
     lower_idx = int((alpha / 2.0) * (n - 1))
     upper_idx = int((1 - alpha / 2.0) * (n - 1))
-    
+
     # Ensure bounds are distinct for small samples
     if lower_idx == upper_idx:
         lower_idx = max(0, lower_idx - 1)
         upper_idx = min(n - 1, upper_idx + 1)
-    
+
     return (sorted_samples[lower_idx], sorted_samples[upper_idx])
 
 
@@ -218,7 +218,7 @@ def quantify_emissions_uncertainty(
     Perform complete uncertainty analysis for emissions calculation.
 
     This is the main entry point for uncertainty quantification in CodeCarbon.
-    
+
     Args:
         energy: Energy consumption measurement
         carbon_intensity_gco2_kwh: Carbon intensity in g CO₂/kWh
@@ -234,17 +234,17 @@ def quantify_emissions_uncertainty(
 
     Returns:
         UncertaintySummary with point estimate and confidence bounds
-        
+
     Note:
         PUE is clamped to ≥ 1.0 as physical data centers cannot achieve PUE < 1.0
-        (would imply negative infrastructure power). Research setups with heat 
-        recovery may report "effective PUE" < 1.0 but this prevents negative 
+        (would imply negative infrastructure power). Research setups with heat
+        recovery may report "effective PUE" < 1.0 but this prevents negative
         carbon artifacts that appear as bugs to most users.
 
     Example:
         >>> energy = Energy.from_kWh(1.5)
         >>> uncertainty = quantify_emissions_uncertainty(
-        ...     energy, 
+        ...     energy,
         ...     carbon_intensity_gco2_kwh=500.0,
         ...     pue=1.2
         ... )
@@ -267,7 +267,7 @@ def quantify_emissions_uncertainty(
     mean_emissions = sum(samples) / len(samples)
     alpha = 1.0 - confidence_level
     ci_lower, ci_upper = compute_confidence_interval(samples, alpha)
-    
+
     # Calculate relative uncertainty
     relative_uncertainty_pct = 0.0
     if mean_emissions > 0:
@@ -287,10 +287,10 @@ def quantify_emissions_uncertainty(
 def assess_uncertainty_quality(relative_uncertainty_pct: float) -> str:
     """
     Provide qualitative assessment of uncertainty magnitude.
-    
+
     Args:
         relative_uncertainty_pct: Relative uncertainty as percentage
-        
+
     Returns:
         Quality assessment string
     """
