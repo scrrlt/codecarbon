@@ -267,9 +267,14 @@ class UncertaintyAwareEmissions(Emissions):
             # Use data source world average instead of hardcoded value
             try:
                 carbon_intensity_per_source = self._data_source.get_carbon_intensity_per_source_data()
-                world_average = carbon_intensity_per_source.get("world_average", 475.0)  # 475.0 as ultimate fallback
-            except Exception:
-                world_average = 475.0  # Ultimate fallback if data source unavailable
-            return world_average
+                world_average = carbon_intensity_per_source.get("world_average", 475.0)
+                return world_average
+            except Exception as e:
+                logger.warning(
+                    f"Data source unavailable for world average ({e}). "
+                    "Using ultimate fallback of 475.0 g CO₂/kWh. "
+                    "This may indicate missing or corrupted library data files."
+                )
+                return 475.0
             
         return carbon_intensity_gco2_kwh

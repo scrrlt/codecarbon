@@ -94,6 +94,9 @@ def estimate_emissions_distribution(
         - Energy measurement: ±10% (typical smart meter uncertainty)
         - Carbon intensity: ±15% (grid mix temporal variation)
         - PUE: ±5% (datacenter efficiency variance)
+        
+        For reliable confidence intervals, n_samples should be ≥ 100.
+        Small sample sizes (< 30) may produce unreliable statistical estimates.
     """
     rng = random.Random() if seed is None else random.Random(seed)  # nosec B311
     samples: list[float] = []
@@ -132,6 +135,10 @@ def compute_confidence_interval(
 
     Returns:
         Tuple of (lower_bound, upper_bound) for confidence interval
+        
+    Note:
+        Sample sizes below 100 may produce statistically unreliable confidence intervals.
+        Consider increasing n_samples for production uncertainty analysis.
     """
     if not samples:
         return (0.0, 0.0)
@@ -139,9 +146,19 @@ def compute_confidence_interval(
     sorted_samples = sorted(samples)
     n = len(sorted_samples)
     
+    # Edge case: very small sample sizes may produce identical bounds
+    if n < 10:
+        # Return min/max for very small samples
+        return (sorted_samples[0], sorted_samples[-1])
+    
     # Calculate percentile indices
     lower_idx = int((alpha / 2.0) * (n - 1))
     upper_idx = int((1 - alpha / 2.0) * (n - 1))
+    
+    # Ensure bounds are distinct for small samples
+    if lower_idx == upper_idx:
+        lower_idx = max(0, lower_idx - 1)
+        upper_idx = min(n - 1, upper_idx + 1)
     
     return (sorted_samples[lower_idx], sorted_samples[upper_idx])
 
