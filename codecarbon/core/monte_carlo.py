@@ -118,6 +118,19 @@ def estimate_emissions_distribution(
         carbon_intensity_gco2_kwh * (carbon_intensity_uncertainty_pct / 100.0) / 2.0
     )
     pue_sigma = pue * (pue_uncertainty_pct / 100.0) / 2.0
+    
+    # Variance summation validation: warn for high uncertainties
+    max_uncertainty = max(
+        energy_uncertainty_pct, 
+        carbon_intensity_uncertainty_pct, 
+        pue_uncertainty_pct
+    )
+    if max_uncertainty > 50.0:
+        logger.warning(
+            f"High uncertainty detected ({max_uncertainty:.1f}%). "
+            f"Normal distribution assumption may be invalid with heavy truncation at zero-boundary. "
+            f"Consider reduced uncertainty bounds or alternative distributions."
+        )
 
     for _ in range(max(1, n_samples)):
         # Sample uncertain parameters
@@ -198,7 +211,19 @@ def compute_confidence_interval(
         lower_idx = max(0, lower_idx - 1)
         upper_idx = min(n - 1, upper_idx + 1)
 
-    return (sorted_samples[lower_idx], sorted_samples[upper_idx])
+    # Floating point precision check for values
+    ci_lower = sorted_samples[lower_idx]
+    ci_upper = sorted_samples[upper_idx]
+    
+    # Check if bounds are numerically indistinguishable
+    if math.isclose(ci_lower, ci_upper, rel_tol=1e-9, abs_tol=1e-12):
+        logger.warning(
+            f"Confidence interval bounds are numerically identical ({ci_lower:.12f}). "
+            f"Relative uncertainty calculation may be misleading. "
+            f"Consider increasing sample size or checking input variability."
+        )
+
+    return (ci_lower, ci_upper)
 
 
 def quantify_emissions_uncertainty(
