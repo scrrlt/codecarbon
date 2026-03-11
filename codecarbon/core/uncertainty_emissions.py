@@ -263,7 +263,7 @@ class UncertaintyAwareEmissions(Emissions):
             ValueError: If energy is zero or calculation is invalid
             ZeroDivisionError: If energy or PUE is zero
         """
-        # Guard against NaN/Infinity inputs
+        # Guard against NaN/Infinity inputs - immediate fallback
         if (
             not math.isfinite(energy_kwh)
             or not math.isfinite(emissions_kg)
@@ -271,18 +271,13 @@ class UncertaintyAwareEmissions(Emissions):
         ):
             logger.warning(
                 "Non-finite input detected (energy_kwh=%s, emissions_kg=%s, pue=%s). "
-                "Using world average fallback.",
+                "Using immediate fallback to prevent cascading math errors.",
                 energy_kwh,
                 emissions_kg,
                 pue,
             )
-            try:
-                carbon_intensity_per_source = (
-                    self._data_source.get_carbon_intensity_per_source_data()
-                )
-                return carbon_intensity_per_source.get("world_average", 475.0)
-            except Exception:
-                return 475.0
+            # Immediate fallback to prevent cascading data source errors
+            return 475.0
 
         if energy_kwh <= 1e-6:  # Below 1 milliwatt-hour threshold
             logger.warning(

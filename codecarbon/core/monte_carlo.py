@@ -166,12 +166,11 @@ def compute_confidence_interval(
             # This ensures we get exact 2.5% and 97.5% percentiles
             n_quantiles = int(1.0 / (alpha / 2.0))  # For α=0.05: 1/0.025 = 40
             quantiles = statistics.quantiles(samples, n=n_quantiles, method="inclusive")
-            # Map to confidence interval bounds
-            lower_idx = int(len(quantiles) * alpha / 2)
-            upper_idx = int(len(quantiles) * (1 - alpha / 2)) - 1
-            # Ensure bounds are within quantiles array
-            lower_idx = max(0, min(lower_idx, len(quantiles) - 1))
-            upper_idx = max(0, min(upper_idx, len(quantiles) - 1))
+            # statistics.quantiles(n=40) returns 39 cut-points (n-1 values)
+            # For 95% CI: index 0 = 2.5th percentile, index 38 = 97.5th percentile
+            n_cuts = len(quantiles)  # This is n_quantiles - 1 = 39
+            lower_idx = 0  # First cut-point is 2.5th percentile
+            upper_idx = n_cuts - 1  # Last cut-point is 97.5th percentile
             return (quantiles[lower_idx], quantiles[upper_idx])
         except (AttributeError, ValueError):
             # Fall back to manual sorting for older Python or edge cases

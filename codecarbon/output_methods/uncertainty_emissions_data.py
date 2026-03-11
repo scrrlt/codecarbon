@@ -8,7 +8,7 @@ metadata and confidence intervals from Monte Carlo analysis.
 import json
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Any
 
 from codecarbon.core.monte_carlo import UncertaintySummary
 from codecarbon.output_methods.emissions_data import EmissionsData, TaskEmissionsData
@@ -68,7 +68,7 @@ class UncertaintyAwareEmissionsData(EmissionsData, UncertaintyMixin):
     """
 
     @property
-    def values(self) -> OrderedDict:
+    def values(self) -> OrderedDict[str, Any]:
         """Extended values property including uncertainty fields."""
         base_values = super().values
 
@@ -128,7 +128,7 @@ class UncertaintyAwareEmissionsData(EmissionsData, UncertaintyMixin):
 
         return summary
 
-    def to_uncertainty_dict(self) -> dict:
+    def to_uncertainty_dict(self) -> dict[str, Any]:
         """
         Extract uncertainty-specific fields as a dictionary.
 
@@ -156,7 +156,7 @@ class UncertaintyAwareEmissionsData(EmissionsData, UncertaintyMixin):
             },
         }
 
-    def toJSON(self):
+    def toJSON(self) -> str:
         """Enhanced JSON serialization including uncertainty data."""
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
