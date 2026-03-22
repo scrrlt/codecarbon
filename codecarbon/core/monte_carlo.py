@@ -19,7 +19,6 @@ import math
 import random
 import statistics
 from dataclasses import dataclass
-from typing import Optional
 
 from codecarbon.core.units import Energy
 from codecarbon.external.logger import logger
@@ -118,12 +117,10 @@ def estimate_emissions_distribution(
         carbon_intensity_gco2_kwh * (carbon_intensity_uncertainty_pct / 100.0) / 2.0
     )
     pue_sigma = pue * (pue_uncertainty_pct / 100.0) / 2.0
-    
+
     # Variance summation validation: warn for high uncertainties
     max_uncertainty = max(
-        energy_uncertainty_pct, 
-        carbon_intensity_uncertainty_pct, 
-        pue_uncertainty_pct
+        energy_uncertainty_pct, carbon_intensity_uncertainty_pct, pue_uncertainty_pct
     )
     if max_uncertainty > 50.0:
         logger.warning(
@@ -214,7 +211,7 @@ def compute_confidence_interval(
     # Floating point precision check for values
     ci_lower = sorted_samples[lower_idx]
     ci_upper = sorted_samples[upper_idx]
-    
+
     # Check if bounds are numerically indistinguishable
     if math.isclose(ci_lower, ci_upper, rel_tol=1e-9, abs_tol=1e-12):
         logger.warning(
@@ -266,7 +263,7 @@ def quantify_emissions_uncertainty(
         carbon artifacts that appear as bugs to most users.
 
     Example:
-        >>> energy = Energy.from_kWh(1.5)
+        >>> energy = Energy.from_energy(1.5)
         >>> uncertainty = quantify_emissions_uncertainty(
         ...     energy,
         ...     carbon_intensity_gco2_kwh=500.0,

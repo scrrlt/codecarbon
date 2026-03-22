@@ -7,8 +7,8 @@ metadata and confidence intervals from Monte Carlo analysis.
 
 import json
 from collections import OrderedDict
-from dataclasses import dataclass, field
-from typing import Optional, Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from codecarbon.core.monte_carlo import UncertaintySummary
 from codecarbon.output_methods.emissions_data import EmissionsData, TaskEmissionsData

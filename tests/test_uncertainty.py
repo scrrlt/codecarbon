@@ -12,10 +12,10 @@ from unittest.mock import Mock, patch
 from codecarbon.core.monte_carlo import (
     UncertaintySummary,
     _sample_normal,
+    assess_uncertainty_quality,
     compute_confidence_interval,
     estimate_emissions_distribution,
     quantify_emissions_uncertainty,
-    assess_uncertainty_quality,
 )
 from codecarbon.core.uncertainty_emissions import UncertaintyAwareEmissions
 from codecarbon.core.units import Energy
@@ -87,7 +87,7 @@ class TestMonteCarloCore(unittest.TestCase):
 
     def test_quantify_emissions_uncertainty(self):
         """Test complete uncertainty quantification."""
-        energy = Energy.from_kWh(1.5)
+        energy = Energy.from_energy(1.5)
 
         result = quantify_emissions_uncertainty(
             energy=energy,
@@ -98,17 +98,11 @@ class TestMonteCarloCore(unittest.TestCase):
         )
 
         # Check that result is a proper UncertaintySummary
-        self.assertIsInstance(result, dict)
-        self.assertIn("method", result)
-        self.assertIn("emissions_kg", result)
-        self.assertIn("ci_lower_kg", result)
-        self.assertIn("ci_upper_kg", result)
-
-        # Basic sanity checks
-        self.assertEqual(result["method"], "monte_carlo")
-        self.assertGreater(result["emissions_kg"], 0)
-        self.assertLessEqual(result["ci_lower_kg"], result["emissions_kg"])
-        self.assertGreaterEqual(result["ci_upper_kg"], result["emissions_kg"])
+        self.assertIsInstance(result, UncertaintySummary)
+        self.assertEqual(result.method, "monte_carlo")
+        self.assertGreater(result.emissions_kg, 0)
+        self.assertLessEqual(result.ci_lower_kg, result.emissions_kg)
+        self.assertGreaterEqual(result.ci_upper_kg, result.emissions_kg)
 
     def test_assess_uncertainty_quality(self):
         """Test uncertainty quality assessment."""
@@ -148,7 +142,7 @@ class TestUncertaintyAwareEmissions(unittest.TestCase):
             "TC": {"carbon_intensity": 400.0}
         }
 
-        energy = Energy.from_kWh(1.0)
+        energy = Energy.from_energy(1.0)
 
         emissions_kg, uncertainty = (
             self.emissions_calc.get_private_infra_emissions_with_uncertainty(
@@ -158,7 +152,7 @@ class TestUncertaintyAwareEmissions(unittest.TestCase):
 
         self.assertEqual(emissions_kg, 0.5)
         self.assertIsNotNone(uncertainty)
-        self.assertIn("method", uncertainty)
+        self.assertEqual(uncertainty.method, "monte_carlo")
 
     def test_uncertainty_disabled(self):
         """Test behavior when uncertainty analysis is disabled."""
@@ -167,7 +161,7 @@ class TestUncertaintyAwareEmissions(unittest.TestCase):
         with patch.object(
             self.emissions_calc, "get_private_infra_emissions", return_value=0.3
         ):
-            energy = Energy.from_kWh(1.0)
+            energy = Energy.from_energy(1.0)
             emissions_kg, uncertainty = (
                 self.emissions_calc.get_private_infra_emissions_with_uncertainty(
                     energy, self.geo
@@ -218,14 +212,14 @@ class TestUncertaintyAwareEmissionsData(unittest.TestCase):
         )
 
         # Create uncertainty summary
-        uncertainty_summary: UncertaintySummary = {
-            "method": "monte_carlo",
-            "emissions_kg": 0.5,
-            "ci_lower_kg": 0.45,
-            "ci_upper_kg": 0.55,
-            "confidence_level_pct": 95.0,
-            "relative_uncertainty_pct": 10.0,
-        }
+        uncertainty_summary = UncertaintySummary(
+            method="monte_carlo",
+            emissions_kg=0.5,
+            ci_lower_kg=0.45,
+            ci_upper_kg=0.55,
+            confidence_level_pct=95.0,
+            relative_uncertainty_pct=10.0,
+        )
 
         emissions_data.set_uncertainty_data(uncertainty_summary)
 
@@ -247,14 +241,14 @@ class TestUncertaintyAwareEmissionsData(unittest.TestCase):
         self.assertIn("no uncertainty analysis", summary)
 
         # Test with uncertainty
-        uncertainty_summary: UncertaintySummary = {
-            "method": "monte_carlo",
-            "emissions_kg": 0.5,
-            "ci_lower_kg": 0.45,
-            "ci_upper_kg": 0.55,
-            "confidence_level_pct": 95.0,
-            "relative_uncertainty_pct": 10.0,
-        }
+        uncertainty_summary = UncertaintySummary(
+            method="monte_carlo",
+            emissions_kg=0.5,
+            ci_lower_kg=0.45,
+            ci_upper_kg=0.55,
+            confidence_level_pct=95.0,
+            relative_uncertainty_pct=10.0,
+        )
 
         emissions_data.set_uncertainty_data(uncertainty_summary)
         summary = emissions_data.format_uncertainty_summary()
