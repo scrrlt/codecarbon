@@ -40,6 +40,7 @@ dependencies = [
     "questionary",
     "rich",
     "typer",
+    "pycountry",
 ]
 
 [tool.setuptools.dynamic]
@@ -60,6 +61,7 @@ codecarbon = [
     "data/canada_provinces.geojson",
     "data/private_infra/global_energy_mix.json",
     "data/private_infra/carbon_intensity_per_source.json",
+    "data/private_infra/nordic_emissions.json",
     "data/private_infra/2016/usa_emissions.json",
     "data/private_infra/2023/canada_energy_mix.json",
     "viz/assets/car_icon.png",
@@ -110,7 +112,10 @@ viz-legacy = [
     "dash_bootstrap_components > 1.0.0",
     "fire",
 ]
-
+# To support AMD GPU
+amdsmi = [
+    "amdsmi>=6.0.0"
+]
 
 [project.scripts]
 carbonboard = "codecarbon.viz.carbonboard:main"
@@ -142,7 +147,7 @@ docs-check-drift = "python scripts/check-docs-drift.py"
 carbonboard = "python codecarbon/viz/carbonboard.py"
 
 [tool.bumpver]
-current_version = "3.2.3"
+current_version = "3.2.5"
 version_pattern = "MAJOR.MINOR.PATCH[_TAGNUM]"
 
 [tool.bumpver.file_patterns]
